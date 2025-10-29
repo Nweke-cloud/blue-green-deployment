@@ -1,0 +1,6 @@
+.env
+*.pem
+*.ppk
+.DS_Store
+instance-details.json
+ec2-public-ip.txt
