@@ -1,7 +1,6 @@
 version: '3.8'
 
 services:
-  # Blue service (primary)
   app_blue:
     image: ${BLUE_IMAGE}
     container_name: app_blue
@@ -21,7 +20,6 @@ services:
       - app_network
     restart: unless-stopped
 
-  # Green service (backup)
   app_green:
     image: ${GREEN_IMAGE}
     container_name: app_green
@@ -41,7 +39,6 @@ services:
       - app_network
     restart: unless-stopped
 
-  # Nginx reverse proxy
   nginx:
     image: nginx:alpine
     container_name: nginx_proxy
@@ -49,6 +46,7 @@ services:
       - "8080:80"
     volumes:
       - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - nginx_logs:/var/log/nginx
     depends_on:
       - app_blue
       - app_green
@@ -56,6 +54,29 @@ services:
       - app_network
     restart: unless-stopped
 
+  alert_watcher:
+    image: python:3.9-slim
+    container_name: alert_watcher
+    working_dir: /app
+    volumes:
+      - ./watcher.py:/app/watcher.py:ro
+      - ./requirements.txt:/app/requirements.txt:ro
+      - nginx_logs:/var/log/nginx:ro
+    environment:
+      - SLACK_WEBHOOK_URL=${SLACK_WEBHOOK_URL}
+      - ERROR_RATE_THRESHOLD=${ERROR_RATE_THRESHOLD}
+      - WINDOW_SIZE=${WINDOW_SIZE}
+      - ALERT_COOLDOWN_SEC=${ALERT_COOLDOWN_SEC}
+    command: sh -c "pip install -q -r requirements.txt && python watcher.py"
+    depends_on:
+      - nginx
+    networks:
+      - app_network
+    restart: unless-stopped
+
 networks:
   app_network:
     driver: bridge
+
+volumes:
+  nginx_logs:
